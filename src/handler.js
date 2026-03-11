@@ -1,17 +1,25 @@
+const XLSX = require("xlsx");
 const { humanDelay, humanType, humanClick, humanMouseMove, sleep } = require("./human");
 
 const TARGET_URL =
-  "https://apps.atidsm.co.il/AtidWeb/GARY/frmElemIndexList.aspx";
+  "https://apps.atidsm.co.il/AtidWeb/GARY/frmIndexList.aspx";
 
 async function run(browser, options = {}) {
   const {
     username = process.env.ATID_USERNAME,
     password = process.env.ATID_PASSWORD,
+    bankAccount,
+    bankId,
+    snifId,
     headless = true,
   } = options;
 
   if (!username || !password) {
     throw new Error("Missing credentials. Set ATID_USERNAME and ATID_PASSWORD in .env or pass them as options.");
+  }
+
+  if (!bankAccount || !bankId || !snifId) {
+    throw new Error("Missing required parameters: bankAccount, bankId, and snifId.");
   }
 
   const context = await browser.newContext({
@@ -137,16 +145,102 @@ async function run(browser, options = {}) {
         break;
       }
     }
+
+    const screenshot = await page.screenshot({ fullPage: true });
+    await context.close();
+    return { success: false, url: currentUrl, screenshot: screenshot.toString("base64"), colA: null, colB: null };
   }
 
-  const screenshot = await page.screenshot({ fullPage: true });
+  // --- Download Excel report ---
+  console.log("Clicking Excel download button...");
+  await humanDelay(1000, 2000);
 
+  const [download] = await Promise.all([
+    page.waitForEvent("download", { timeout: 30000 }),
+    page.click("#ctl00_ContentPlaceHolder1_awXlsReport"),
+  ]);
+
+  const downloadPath = await download.path();
+  console.log("Excel downloaded to:", downloadPath);
+
+  // --- Parse Excel and search for bankAccount ---
+  const workbook = XLSX.readFile(downloadPath);
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+  let colA = null;
+  let colB = null;
+  const searchValue = String(bankAccount).trim();
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const cellE = row[4] !== undefined ? String(row[4]).trim() : "";
+    if (cellE === searchValue) {
+      colA = row[0] !== undefined ? row[0] : null;
+      colB = row[1] !== undefined ? row[1] : null;
+      console.log(`Found bankAccount "${searchValue}" at row ${i + 1}`);
+      console.log(`  Column A: ${colA}`);
+      console.log(`  Column B: ${colB}`);
+      break;
+    }
+  }
+
+  if (colA === null && colB === null) {
+    console.log(`bankAccount "${searchValue}" not found in column E`);
+    const screenshot = await page.screenshot({ fullPage: true });
+    await context.close();
+    return { success: false, url: currentUrl, screenshot: screenshot.toString("base64"), colA: null, colB: null };
+  }
+
+  // --- Navigate to candidate update page ---
+  const CANDIDATE_URL = "https://apps.atidsm.co.il/AtidWeb/GARY/frmCandidateUpdate.aspx?Init=true";
+  console.log("Navigating to candidate update page...");
+  await page.goto(CANDIDATE_URL, { waitUntil: "load", timeout: 30000 });
+  await humanDelay(2000, 4000);
+
+  // Fill col A value into the employee field
+  const empFieldSelector = "#ctl00_ctl00_ContentPlaceHolder1_ContentCollection_atbFromEmp";
+  console.log(`Typing col A value "${colA}" into employee field...`);
+  await humanType(page, empFieldSelector, String(colA));
+  await page.keyboard.press("Tab");
+  console.log("Waiting 5 seconds for field to process...");
+  await sleep(5000);
+
+  // Click the create express receipt button (may trigger AJAX, not a full navigation)
+  const createReceiptSelector = "#ctl00_ctl00_ContentPlaceHolder1_ContentCollection_lbCreateExpressReceipt";
+  console.log("Clicking create express receipt...");
+  await humanClick(page, createReceiptSelector);
+
+  // Wait for the success popup to appear
+  console.log("Waiting for success popup...");
+  try {
+    await page.waitForSelector("#puSuccesCreateReceipt", { state: "visible", timeout: 30000 });
+  } catch {
+    console.log("Popup not visible after 30s, taking debug screenshot...");
+    const debugShot = await page.screenshot({ fullPage: true });
+    const fs = require("fs");
+    fs.writeFileSync("debug-popup.png", debugShot);
+    console.log("Debug screenshot saved to debug-popup.png");
+    throw new Error("Success popup #puSuccesCreateReceipt did not appear");
+  }
+
+  await humanDelay(500, 1000);
+
+  console.log("Clicking confirmation button in success popup...");
+  await humanClick(page, "#puSuccesCreateReceipt .popup-cancel");
+  await humanDelay(1500, 3000);
+
+  console.log("Done!");
+
+  const screenshot = await page.screenshot({ fullPage: true });
   await context.close();
 
   return {
-    success: isLoggedIn,
-    url: currentUrl,
+    success: true,
+    url: page.url(),
     screenshot: screenshot.toString("base64"),
+    colA,
+    colB,
   };
 }
 
@@ -159,6 +253,9 @@ async function handler(event, context) {
     const result = await run(browser, {
       username: event?.username,
       password: event?.password,
+      bankAccount: event?.bankAccount,
+      bankId: event?.bankId,
+      snifId: event?.snifId,
     });
 
     return {
@@ -166,6 +263,8 @@ async function handler(event, context) {
       body: JSON.stringify({
         success: result.success,
         url: result.url,
+        colA: result.colA,
+        colB: result.colB,
         screenshotBase64: result.screenshot,
       }),
     };
