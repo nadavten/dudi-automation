@@ -206,28 +206,21 @@ async function run(browser, options = {}) {
   console.log("Waiting 5 seconds for field to process...");
   await sleep(5000);
 
-  // Click the create express receipt button (may trigger AJAX, not a full navigation)
-  const createReceiptSelector = "#ctl00_ctl00_ContentPlaceHolder1_ContentCollection_lbCreateExpressReceipt";
-  console.log("Clicking create express receipt...");
-  await humanClick(page, createReceiptSelector);
+  // Click the next step button
+  const nextBtnSelector = "#ctl00_ctl00_ContentPlaceHolder1_StepNextButton";
+  console.log("Clicking next step button...");
+  await humanClick(page, nextBtnSelector, { waitForNav: true });
+  await humanDelay(1500, 3000);
 
-  // Wait for the success popup to appear
-  console.log("Waiting for success popup...");
-  try {
-    await page.waitForSelector("#puSuccesCreateReceipt", { state: "visible", timeout: 30000 });
-  } catch {
-    console.log("Popup not visible after 30s, taking debug screenshot...");
-    const debugShot = await page.screenshot({ fullPage: true });
-    const fs = require("fs");
-    fs.writeFileSync("debug-popup.png", debugShot);
-    console.log("Debug screenshot saved to debug-popup.png");
-    throw new Error("Success popup #puSuccesCreateReceipt did not appear");
-  }
+  // Click OK on the popup
+  console.log("Clicking OK on popup...");
+  await page.waitForSelector("#ctl00_ctl00_lbOk", { state: "visible", timeout: 15000 });
+  await humanClick(page, "#ctl00_ctl00_lbOk", { waitForNav: true });
+  await humanDelay(1500, 3000);
 
-  await humanDelay(500, 1000);
-
-  console.log("Clicking confirmation button in success popup...");
-  await humanClick(page, "#puSuccesCreateReceipt .popup-cancel");
+  // Click the new receipt button
+  console.log("Clicking new receipt button...");
+  await humanClick(page, "#ctl00_ctl00_ContentPlaceHolder1_ContentCollection_btnNewReceipt", { waitForNav: true });
   await humanDelay(1500, 3000);
 
   console.log("Done!");
