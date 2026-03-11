@@ -5,6 +5,7 @@
  *   node src/local.js --headed  → visible browser window
  */
 
+require("dotenv").config();
 const { launchLocal } = require("./browser");
 const { run } = require("./handler");
 
@@ -17,8 +18,6 @@ const { run } = require("./handler");
 
   try {
     const result = await run(browser, {
-      username: "שירות גרי",
-      password: "atid@11",
       headless: !headed,
     });
 

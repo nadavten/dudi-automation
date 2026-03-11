@@ -1,14 +1,18 @@
 const { humanDelay, humanType, humanClick, humanMouseMove, sleep } = require("./human");
 
 const TARGET_URL =
-  "https://apps.atidsm.co.il/AtidWeb/GARY/Login.aspx?ReturnUrl=%2fAtidWeb%2fGARY%2ffrmAhidFeedback.aspx";
+  "https://apps.atidsm.co.il/AtidWeb/GARY/frmElemIndexList.aspx";
 
 async function run(browser, options = {}) {
   const {
-    username = "שירות גרי",
-    password = "atid@11",
+    username = process.env.ATID_USERNAME,
+    password = process.env.ATID_PASSWORD,
     headless = true,
   } = options;
+
+  if (!username || !password) {
+    throw new Error("Missing credentials. Set ATID_USERNAME and ATID_PASSWORD in .env or pass them as options.");
+  }
 
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
@@ -153,8 +157,8 @@ async function handler(event, context) {
   try {
     browser = await launchLambda();
     const result = await run(browser, {
-      username: event?.username || "שירות גרי",
-      password: event?.password || "atid@11",
+      username: event?.username,
+      password: event?.password,
     });
 
     return {
