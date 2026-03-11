@@ -1,5 +1,5 @@
 const XLSX = require("xlsx");
-const { humanDelay, humanType, humanClick, humanMouseMove, sleep } = require("./human");
+const { humanDelay, humanType, humanClick, humanMouseMove, humanScroll, sleep } = require("./human");
 
 const TARGET_URL =
   "https://apps.atidsm.co.il/AtidWeb/GARY/frmIndexList.aspx";
@@ -11,6 +11,9 @@ async function run(browser, options = {}) {
     bankAccount,
     bankId,
     snifId,
+    asmahtaNumber,
+    valueDate,
+    sum,
     headless = true,
   } = options;
 
@@ -18,8 +21,8 @@ async function run(browser, options = {}) {
     throw new Error("Missing credentials. Set ATID_USERNAME and ATID_PASSWORD in .env or pass them as options.");
   }
 
-  if (!bankAccount || !bankId || !snifId) {
-    throw new Error("Missing required parameters: bankAccount, bankId, and snifId.");
+  if (!bankAccount || !bankId || !snifId || !asmahtaNumber || !valueDate || !sum) {
+    throw new Error("Missing required parameters: bankAccount, bankId, snifId, asmahtaNumber, valueDate, and sum.");
   }
 
   const context = await browser.newContext({
@@ -55,98 +58,81 @@ async function run(browser, options = {}) {
     window._mouseY = 400;
   });
 
-  console.log("Navigating to login page...");
-  await page.goto(TARGET_URL, { waitUntil: "networkidle", timeout: 30000 });
-  await humanDelay(1500, 3000);
-
-  console.log("Page loaded, looking for login form...");
-
   const usernameSelector = "#Login1_UserName";
   const passwordSelector = "#Login1_Password";
-  const submitButtonSelector = 'input[name="Login1$ctl01"]';
 
-  await humanMouseMove(page, 400, 300);
-  await humanDelay(500, 1000);
+  async function attemptLogin() {
+    console.log("Navigating to login page...");
+    await page.goto(TARGET_URL, { waitUntil: "networkidle", timeout: 30000 });
+    await humanDelay(2000, 4000);
 
-  console.log("Typing username...");
-  await humanType(page, usernameSelector, username);
-  await humanDelay(500, 1200);
+    console.log("Page loaded, interacting with page before login...");
 
-  console.log("Typing password...");
-  await humanType(page, passwordSelector, password);
-  await humanDelay(800, 1500);
+    // Warm up reCAPTCHA score with human-like browsing
+    await humanMouseMove(page, 300, 200);
+    await humanDelay(500, 1000);
+    await humanMouseMove(page, 700, 400);
+    await humanDelay(300, 700);
+    await humanScroll(page, "down", 100);
+    await humanDelay(500, 1000);
+    await humanScroll(page, "up", 100);
+    await humanDelay(500, 1000);
+    await humanMouseMove(page, 500, 350);
+    await humanDelay(300, 800);
 
-  await humanMouseMove(page, 500, 450);
-  await humanDelay(300, 600);
+    console.log("Typing username...");
+    await humanType(page, usernameSelector, username);
+    await humanDelay(800, 1500);
 
-  console.log("Waiting for reCAPTCHA to be ready...");
-  await page.waitForFunction(
-    () => typeof grecaptcha !== "undefined" && typeof grecaptcha.enterprise !== "undefined",
-    { timeout: 10000 }
-  ).catch(() => console.log("reCAPTCHA object not found, proceeding anyway..."));
-  await humanDelay(500, 1000);
+    console.log("Typing password...");
+    await humanType(page, passwordSelector, password);
+    await humanDelay(1000, 2000);
 
-  console.log("Clicking login button (triggering reCAPTCHA flow)...");
+    await humanMouseMove(page, 500, 450);
+    await humanDelay(500, 1000);
 
-  // The page's btnLogin_clientClick() does:
-  // 1. grecaptcha.enterprise.execute() to get a token
-  // 2. Sets the token in hidden field Login1$reCaptchaToken
-  // 3. Clicks the hidden Login1_LoginButton <a> to trigger ASP.NET PostBack
-  //
-  // We call it via JS and wait for navigation.
-  const navigationPromise = page
-    .waitForNavigation({ waitUntil: "networkidle", timeout: 20000 })
-    .catch(() => null);
+    console.log("Waiting for reCAPTCHA to be ready...");
+    await page.waitForFunction(
+      () => typeof grecaptcha !== "undefined" && typeof grecaptcha.enterprise !== "undefined",
+      { timeout: 10000 }
+    ).catch(() => console.log("reCAPTCHA object not found, proceeding anyway..."));
+    await humanDelay(1000, 2000);
 
-  await page.evaluate(() => btnLogin_clientClick());
-  const navResult = await navigationPromise;
+    console.log("Clicking login button...");
+    const navigationPromise = page
+      .waitForNavigation({ waitUntil: "networkidle", timeout: 20000 })
+      .catch(() => null);
 
-  if (!navResult) {
-    console.log("reCAPTCHA flow didn't navigate, checking token and retrying...");
-    const token = await page.$eval("#Login1_reCaptchaToken", (el) => el.value).catch(() => "");
-    console.log("reCAPTCHA token present:", !!token, token ? `(${token.length} chars)` : "");
+    await page.evaluate(() => btnLogin_clientClick());
+    await navigationPromise;
+    await humanDelay(1000, 2000);
 
-    if (token) {
-      const retryNav = page
-        .waitForNavigation({ waitUntil: "networkidle", timeout: 15000 })
-        .catch(() => null);
-      await page.evaluate(() => document.getElementById("Login1_LoginButton").click());
-      await retryNav;
-    } else {
-      console.log("No reCAPTCHA token, attempting direct PostBack...");
-      const directNav = page
-        .waitForNavigation({ waitUntil: "networkidle", timeout: 15000 })
-        .catch(() => null);
-      await page.evaluate(() => __doPostBack("Login1$LoginButton", ""));
-      await directNav;
-    }
+    return !page.url().includes("Login.aspx");
   }
 
-  await humanDelay(2000, 4000);
+  // Try login up to 3 times
+  let loggedIn = false;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    console.log(`Login attempt ${attempt}/3...`);
+    loggedIn = await attemptLogin();
+    if (loggedIn) break;
+    console.log(`Attempt ${attempt} failed, waiting before retry...`);
+    await sleep(3000);
+  }
 
   const currentUrl = page.url();
   console.log("Current URL after login:", currentUrl);
+  console.log(loggedIn ? "Login successful!" : "Login failed after all attempts");
 
-  const isLoggedIn = !currentUrl.includes("Login.aspx");
-  console.log(isLoggedIn ? "Login successful!" : "Login may have failed - still on login page");
-
-  if (!isLoggedIn) {
+  if (!loggedIn) {
     const pageText = await page.textContent("body").catch(() => "");
-    const errorPatterns = [
-      /כניסה נכשלה/,
-      /שגיאה/,
-      /Login failed/i,
-      /incorrect/i,
-    ];
-    for (const pat of errorPatterns) {
-      const match = pageText.match(pat);
-      if (match) {
-        console.log("Error found on page:", match[0]);
-        break;
-      }
-    }
+    console.log("Page text excerpt:", pageText.substring(0, 300));
 
     const screenshot = await page.screenshot({ fullPage: true });
+    const fs = require("fs");
+    fs.writeFileSync("debug-login-fail.png", screenshot);
+    console.log("Debug screenshot saved to debug-login-fail.png");
+
     await context.close();
     return { success: false, url: currentUrl, screenshot: screenshot.toString("base64"), colA: null, colB: null };
   }
@@ -223,6 +209,49 @@ async function run(browser, options = {}) {
   await humanClick(page, "#ctl00_ctl00_ContentPlaceHolder1_ContentCollection_btnNewReceipt", { waitForNav: true });
   await humanDelay(1500, 3000);
 
+  // Fill bank details
+  console.log(`Filling bank details: bankId=${bankId}, snifId=${snifId}, bankAccount=${bankAccount}`);
+
+  await humanType(page, "#ctl00_ContentPlaceHolder1_atbBank", String(bankId));
+  await page.keyboard.press("Tab");
+  await humanDelay(500, 1000);
+
+  await humanType(page, "#ctl00_ContentPlaceHolder1_atbBranch", String(snifId));
+  await page.keyboard.press("Tab");
+  await humanDelay(500, 1000);
+
+  await humanType(page, "#ctl00_ContentPlaceHolder1_atbPullAccount", String(bankAccount));
+  await page.keyboard.press("Tab");
+  await humanDelay(500, 1000);
+
+  console.log(`Filling asmahtaNumber=${asmahtaNumber}, valueDate=${valueDate}, sum=${sum}`);
+
+  await humanType(page, "#ctl00_ContentPlaceHolder1_atbChequeNum", String(asmahtaNumber));
+  await page.keyboard.press("Tab");
+  await humanDelay(500, 1000);
+
+  await humanType(page, "#ctl00_ContentPlaceHolder1_tbValueDate", String(valueDate));
+  await page.keyboard.press("Tab");
+  await humanDelay(500, 1000);
+
+  await humanType(page, "#ctl00_ContentPlaceHolder1_atbTotalInNIS", String(sum));
+  await page.keyboard.press("Tab");
+  await humanDelay(500, 1000);
+
+  // Add cheque (button may be hidden, click via JS)
+  console.log("Clicking add cheque...");
+  const addChequeNav = page
+    .waitForNavigation({ waitUntil: "networkidle", timeout: 20000 })
+    .catch(() => null);
+  await page.evaluate(() => document.getElementById("ctl00_ContentPlaceHolder1_ibAddCheque").click());
+  await addChequeNav;
+  await humanDelay(1500, 3000);
+
+  // Create source
+  console.log("Clicking create source...");
+  await humanClick(page, "#ctl00_ContentPlaceHolder1_btnCreateSource", { waitForNav: true });
+  await humanDelay(1500, 3000);
+
   console.log("Done!");
 
   const screenshot = await page.screenshot({ fullPage: true });
@@ -249,6 +278,9 @@ async function handler(event, context) {
       bankAccount: event?.bankAccount,
       bankId: event?.bankId,
       snifId: event?.snifId,
+      asmahtaNumber: event?.asmahtaNumber,
+      valueDate: event?.valueDate,
+      sum: event?.sum,
     });
 
     return {

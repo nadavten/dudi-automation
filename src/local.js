@@ -1,8 +1,7 @@
 /**
  * Local test runner — launches a real browser for debugging.
  * Usage:
- *   node src/local.js <bankAccount> <bankId> <snifId>           → headless
- *   node src/local.js <bankAccount> <bankId> <snifId> --headed  → visible browser
+ *   node src/local.js <bankAccount> <bankId> <snifId> <asmahtaNumber> <valueDate> <sum> [--headed]
  */
 
 require("dotenv").config();
@@ -13,15 +12,15 @@ const { run } = require("./handler");
   const headed = process.argv.includes("--headed");
   const args = process.argv.slice(2).filter((a) => a !== "--headed");
 
-  if (args.length < 3) {
-    console.error("Usage: node src/local.js <bankAccount> <bankId> <snifId> [--headed]");
+  if (args.length < 6) {
+    console.error("Usage: node src/local.js <bankAccount> <bankId> <snifId> <asmahtaNumber> <valueDate> <sum> [--headed]");
     process.exit(1);
   }
 
-  const [bankAccount, bankId, snifId] = args;
+  const [bankAccount, bankId, snifId, asmahtaNumber, valueDate, sum] = args;
 
   console.log(`Launching browser (${headed ? "headed" : "headless"}) with stealth...`);
-  console.log(`Bank account: ${bankAccount}, Bank ID: ${bankId}, Snif ID: ${snifId}`);
+  console.log(`Bank: ${bankId}/${snifId}/${bankAccount}, Asmahta: ${asmahtaNumber}, Date: ${valueDate}, Sum: ${sum}`);
 
   const browser = await launchLocal({ headed });
 
@@ -30,6 +29,9 @@ const { run } = require("./handler");
       bankAccount,
       bankId,
       snifId,
+      asmahtaNumber,
+      valueDate,
+      sum,
       headless: !headed,
     });
 
