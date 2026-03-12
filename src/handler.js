@@ -209,7 +209,12 @@ async function run(browser, options = {}) {
   await humanClick(page, "#ctl00_ctl00_ContentPlaceHolder1_ContentCollection_btnNewReceipt", { waitForNav: true });
   await humanDelay(1500, 3000);
 
-  // Fill bank details
+  // Fill client number and bank details
+  console.log(`Filling client number: ${colA}`);
+  await humanType(page, "#ctl00_ContentPlaceHolder1_atbClientNum", String(colA));
+  await page.keyboard.press("Tab");
+  await humanDelay(500, 1000);
+
   console.log(`Filling bank details: bankId=${bankId}, snifId=${snifId}, bankAccount=${bankAccount}`);
 
   await humanType(page, "#ctl00_ContentPlaceHolder1_atbBank", String(bankId));
