@@ -1,27 +1,23 @@
 {
   "name": "dudi",
   "version": "1.0.0",
-  "main": "src/handler.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node src/local.js --headed",
-    "start:headless": "node src/local.js",
-    "build": "node esbuild.config.js",
-    "package": "node esbuild.config.js && cd dist && powershell Compress-Archive -Path handler.js,handler.js.map -DestinationPath lambda.zip -Force"
+    "start": "node src/server.js",
+    "start:headed": "node src/server.js --headed",
+    "local": "node src/local.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "Playwright browser automation running on AWS Lambda",
+  "description": "Playwright browser automation with Express API",
   "dependencies": {
-    "playwright-aws-lambda": "^0.11.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.1.0",
+    "playwright": "^1.58.2",
     "playwright-core": "^1.58.2",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "dotenv": "^17.3.1",
-    "esbuild": "^0.27.3",
-    "playwright": "^1.58.2"
   }
 }

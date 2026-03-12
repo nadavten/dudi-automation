@@ -1,9 +1,8 @@
 /**
- * Browser launch helpers for local and Lambda environments.
- * Uses playwright-extra + stealth plugin to avoid bot detection.
+ * Browser launch helper with stealth plugin to avoid bot detection.
  */
 
-async function launchLocal(options = {}) {
+async function launchBrowser(options = {}) {
   const { chromium } = require("playwright-extra");
   const stealth = require("puppeteer-extra-plugin-stealth");
   chromium.use(stealth());
@@ -26,15 +25,4 @@ async function launchLocal(options = {}) {
   return browser;
 }
 
-async function launchLambda() {
-  const playwright = require("playwright-aws-lambda");
-  return playwright.launchChromium({
-    headless: true,
-    args: [
-      "--disable-blink-features=AutomationControlled",
-      "--no-sandbox",
-    ],
-  });
-}
-
-module.exports = { launchLocal, launchLambda };
+module.exports = { launchBrowser };

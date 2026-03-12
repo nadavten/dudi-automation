@@ -5,7 +5,7 @@
  */
 
 require("dotenv").config();
-const { launchLocal } = require("./browser");
+const { launchBrowser } = require("./browser");
 const { run } = require("./handler");
 
 (async () => {
@@ -22,7 +22,7 @@ const { run } = require("./handler");
   console.log(`Launching browser (${headed ? "headed" : "headless"}) with stealth...`);
   console.log(`Bank: ${bankId}/${snifId}/${bankAccount}, Asmahta: ${asmahtaNumber}, Date: ${valueDate}, Sum: ${sum}`);
 
-  const browser = await launchLocal({ headed });
+  const browser = await launchBrowser({ headed });
 
   try {
     const result = await run(browser, {

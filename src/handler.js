@@ -266,42 +266,4 @@ async function run(browser, options = {}) {
   };
 }
 
-async function handler(event, context) {
-  const { launchLambda } = require("./browser");
-  let browser = null;
-
-  try {
-    browser = await launchLambda();
-    const result = await run(browser, {
-      username: event?.username,
-      password: event?.password,
-      bankAccount: event?.bankAccount,
-      bankId: event?.bankId,
-      snifId: event?.snifId,
-      asmahtaNumber: event?.asmahtaNumber,
-      valueDate: event?.valueDate,
-      sum: event?.sum,
-    });
-
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        success: result.success,
-        url: result.url,
-        colA: result.colA,
-        colB: result.colB,
-        screenshotBase64: result.screenshot,
-      }),
-    };
-  } catch (error) {
-    console.error("Handler error:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
-    };
-  } finally {
-    if (browser) await browser.close();
-  }
-}
-
-module.exports = { handler, run };
+module.exports = { run };
