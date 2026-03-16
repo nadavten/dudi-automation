@@ -110,14 +110,15 @@ async function run(browser, options = {}) {
     return !page.url().includes("Login.aspx");
   }
 
-  // Try login up to 3 times
+  const MAX_ATTEMPTS = 5;
   let loggedIn = false;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    console.log(`Login attempt ${attempt}/3...`);
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    console.log(`Login attempt ${attempt}/${MAX_ATTEMPTS}...`);
     loggedIn = await attemptLogin();
     if (loggedIn) break;
-    console.log(`Attempt ${attempt} failed, waiting before retry...`);
-    await sleep(3000);
+    const backoff = 5000 + attempt * 5000;
+    console.log(`Attempt ${attempt} failed, waiting ${backoff / 1000}s before retry...`);
+    await sleep(backoff);
   }
 
   const currentUrl = page.url();
