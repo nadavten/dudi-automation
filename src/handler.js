@@ -80,7 +80,7 @@ async function run(browser, options = {}) {
     await humanMouseMove(page, 500, 350);
     await humanDelay(300, 800);
 
-    console.log("Typing username...");
+    console.log(`Typing username: ${username}`);
     await humanType(page, usernameSelector, username);
     await humanDelay(800, 1500);
 
